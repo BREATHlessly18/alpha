@@ -1,33 +1,42 @@
-#include "proccessModule.hpp"
-#include <string>
 #include <signal.h>
 
-auto sigOperate(int sig) -> void
-{
-    proccessModule::getInstance().stop();
-}
+#include <condition_variable>
+#include <fstream>
+#include <iostream>
+#include <mutex>
+#include <string>
 
-// Ö÷º¯ÊýÐëÐ¯´ø²É¼¯Ê±¼ä²ÎÊý£¬²ÎÊýÎª0±íÊ¾Ò»Ö±²É¼¯£¬ÆäÓàÕýÕûÊý±íÊ¾²É¼¯Ê±³¤
-int main(int argc, char *argv[])
-{
-    if (argc != 2)
-    {
-        return -1;
-    }
+#include "base/logger.hpp"
+#include "capture/worker.hpp"
+#include "nlohmann/json.hpp"
 
-    //signal(SIGINT, sigOperate);
+std::mutex mtx{};
+std::condition_variable cond{};
 
-    proccessModule::getInstance().start();
+using Worker = video_capture::capture::Worker;
+using Logger = video_capture::base::Logger;
 
-    if (0 == int(atoi(argv[1])))
-    {
-        while (true)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-    }
-    std::this_thread::sleep_for(std::chrono::seconds(atoi(argv[1])));
-    proccessModule::getInstance().stop();
+// ä¸»å‡½æ•°é¡»æºå¸¦é‡‡é›†æ—¶é—´å‚æ•°ï¼Œå‚æ•°ä¸º0è¡¨ç¤ºä¸€ç›´é‡‡é›†ï¼Œå…¶ä½™æ­£æ•´æ•°è¡¨ç¤ºé‡‡é›†æ—¶é•¿
+int main() {
+  nlohmann::json config;
+  std::ifstream("capture-config.json") >> config;
 
-    return 0;
+  // init log
+  auto rval = Logger::init(config["log_config"],
+                           config["touch_loginit_file"].get<bool>());
+  if (Logger::LogError::kOK != rval and rval == Logger::LogError::kparseError) {
+    return -1;
+  }
+
+  // start
+  Worker::getInstance().start();
+
+  std::unique_lock<std::mutex> lock(mtx);
+  cond.wait_for(lock,
+                std::chrono::seconds(config["capture_second"].get<uint8_t>()));
+
+  // stop
+  Worker::getInstance().stop();
+
+  return 0;
 }

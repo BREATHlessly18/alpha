@@ -1,0 +1,11 @@
+{
+    "capture_second": 10,
+    "log_config": {
+        "log_path": "log.txt",
+        "max_log_size": "1M",
+        "max_rotate_file_number": 3,
+        "log_level": "info",
+        "is_console": true
+    },
+    "touch_loginit_file": false
+}
